@@ -1,4 +1,4 @@
-# 🔮 Private Prediction Market — Chainlink CRE
+# 🔮 Mask Prediction — Chainlink CRE
 
 > A privacy-preserving prediction market powered by a **commit–reveal scheme** and **Chainlink CRE (Compute Runtime Environment)** for AI-driven settlement.
 

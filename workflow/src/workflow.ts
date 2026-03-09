@@ -1,13 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Private Prediction Market — CRE Workflow  (TypeScript SDK v1.1.x)
-//
-// Fixes from previous version:
-//   [1] Zod .default() removed — Runner was inferring string|undefined per fix
-//   [2] HTTP payload field: .body → .input  (SDK Payload type uses .input)
-//   [3] runtime.getSecret("KEY") → runtime.getSecret({ id: "KEY" }).result().value
-//   [4] Gemini result properly typed as GeminiSettlementResult, not Secret
-// ─────────────────────────────────────────────────────────────────────────────
-
 import {
   Runner,
   handler,
@@ -37,12 +27,7 @@ import {
   type GeminiSettlementResult,
 } from "./gemini.js";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Config Schema
-//
-// ✅ NO .default() — required so Runner<Config> infers all fields as `string`,
-//    not `string | undefined`. All values live in config.staging.json.
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 const configSchema = z.object({
   chainSelectorName: z.string(), // "ethereum-testnet-sepolia"
@@ -68,17 +53,6 @@ function hexToBase64Payload(hex: `0x${string}`): string {
   return Buffer.from(hex.slice(2), "hex").toString("base64");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Handler 1 — HTTP Trigger → Create Market
-//
-//  Trigger fires when a POST request arrives at the CRE workflow endpoint.
-//  Body (JSON): { "question": "...", "durationHours": 24, "participants": ["0x..."] }
-//
-//  Encodes instruction 0 (createMarket), signs report, writes via Forwarder.
-//
-//  ⚠️  Callback is SYNCHRONOUS — no async/await with SDK I/O.
-//      All SDK calls use the .result() pattern.
-// ─────────────────────────────────────────────────────────────────────────────
 
 type CreateMarketBody = {
   question: string;
@@ -144,17 +118,7 @@ const onHttpTrigger = (
   return `Market created: "${question}"`;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Handler 2 — EVM Log Trigger → Settle Market via Gemini AI
-//
-//  Fires on: SettlementRequested(uint256 indexed marketId, string question)
-//
-//  Steps:
-//   1. Decode log: marketId from topics[1], question from log.data
-//   2. Fetch Gemini API key via runtime.getSecret({ id: "..." })  
-//   3. Call Gemini via HTTPClient (node consensus mode)
-//   4. Encode instruction 1 = settleMarket → sign → writeReport
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 const onLogTrigger = (runtime: Runtime<Config>, log: EVMLog): string => {
   runtime.log(`[Settle] Log trigger — tx: ${bytesToHex(log.txHash)}`);
@@ -174,16 +138,8 @@ const onLogTrigger = (runtime: Runtime<Config>, log: EVMLog): string => {
 
   runtime.log(`[Settle] Market ${marketId}: "${question}"`);
 
-  // ── Fetch secret ───────────────────────────────────────────────────────────
-  // ✅ Fix [3]: takes { id: "KEY" } object, NOT a plain string
-  // ✅ Fix [4]: .result() returns Secret object — extract .value for the string
-  const geminiKey = runtime.getSecret({ id: "GEMINI_API_KEY" }).result().value;
 
-  // ── Call Gemini via HTTPClient consensus ───────────────────────────────────
-  // HTTPClient.sendRequest(runtime, fn, consensus)(config).result()
-  //   - Each DON node independently calls Gemini
-  //   - consensusIdenticalAggregation requires all nodes to return the same outcome
-  //   - fn signature: (sendRequester: HTTPSendRequester, config: C) => R
+  const geminiKey = runtime.getSecret({ id: "GEMINI_API_KEY" }).result().value;
   const httpCapability = new HTTPClient();
 
   const geminiResult: GeminiSettlementResult = httpCapability

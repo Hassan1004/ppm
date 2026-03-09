@@ -3,15 +3,10 @@ import { ok, text, type HTTPSendRequester } from "@chainlink/cre-sdk";
 const OPENROUTER_URL =
   "https://openrouter.ai/api/v1/chat/completions";
 
-// Change this to whichever Gemini model you prefer on OpenRouter
 const MODEL = "google/gemini-2.0-flash-001";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public types  (unchanged — keeps workflow.ts compatible)
-// ─────────────────────────────────────────────────────────────────────────────
-
 export type GeminiConfig = {
-  apiKey:   string;   // OpenRouter API key from runtime.getSecret(...)
+  apiKey:   string;   
   question: string;
 };
 
@@ -22,16 +17,6 @@ export type GeminiSettlementResult = {
   sources:    string[];
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildGeminiRequest
-//
-//  Called by HTTPClient.sendRequest(runtime, fn, consensus)(config).result()
-//  Each DON node executes this independently; consensus then validates agreement.
-//
-//  Parameters injected by the SDK:
-//    sendRequester — exposes .sendRequest({ url, method, headers, body }).result()
-//    config        — GeminiConfig passed at the call site in workflow.ts
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function buildGeminiRequest(
   sendRequester: HTTPSendRequester,
@@ -59,7 +44,7 @@ export function buildGeminiRequest(
       headers: {
         "Content-Type":  "application/json",
         "Authorization": `Bearer ${config.apiKey}`,
-        "HTTP-Referer":  "https://github.com/Hassan1004/ppm",   // OpenRouter requires this
+        "HTTP-Referer":  "https://github.com/Hassan1004/ppm",  
         "X-Title":       "CRE Prediction Market",
       },
       body: Buffer.from(bodyString).toString("base64"),

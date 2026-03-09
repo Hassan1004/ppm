@@ -1,5 +1,3 @@
-// Shared types used across workflow and gemini modules
-
 export interface MarketConfig {
   chainId: number;
   marketAddress: string;
