@@ -16,7 +16,7 @@
 import { ok, text, type HTTPSendRequester } from "@chainlink/cre-sdk";
 
 const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -61,14 +61,14 @@ export function buildGeminiRequest(
   });
 
   // ── POST to Gemini ────────────────────────────────────────────────────────
-  const response = sendRequester
-    .sendRequest({
-      url:     `${GEMINI_URL}?key=${config.apiKey}`,
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    bodyString,
-    })
-    .result();
+ const response = sendRequester
+  .sendRequest({
+    url: `${GEMINI_URL}?key=${config.apiKey}`,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: Buffer.from(bodyString).toString("base64"),
+  })
+  .result();
 
   // ── HTTP error check ──────────────────────────────────────────────────────
   if (!ok(response)) {

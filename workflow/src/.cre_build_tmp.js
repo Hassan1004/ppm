@@ -16157,7 +16157,7 @@ function hasDynamicChild(param) {
     return true;
   return false;
 }
-var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 function buildGeminiRequest(sendRequester, config) {
   const prompt = buildPrompt(config.question);
   const bodyString = JSON.stringify({
@@ -16172,7 +16172,7 @@ function buildGeminiRequest(sendRequester, config) {
     url: `${GEMINI_URL}?key=${config.apiKey}`,
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: bodyString
+    body: Buffer.from(bodyString).toString("base64")
   }).result();
   if (!ok(response)) {
     return safeDefault(`Gemini HTTP ${response.statusCode}`);
