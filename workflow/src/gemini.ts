@@ -1,29 +1,17 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Gemini AI Settlement Helper — CRE TypeScript SDK v1.1.x
-//
-// This module exports `buildGeminiRequest` which is passed to
-// HTTPClient.sendRequest(runtime, buildGeminiRequest, consensus)(config)
-// in workflow.ts.
-//
-// The function signature (sendRequester, config) matches the SDK's required
-// fn type: (sendRequester: HTTPSendRequester, config: C) => R
-//
-// Privacy note: swap HTTPClient → ConfidentialHTTPClient in workflow.ts
-// when the SDK exits experimental to route through a TEE enclave.
-// This file requires no changes for that upgrade.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { ok, text, type HTTPSendRequester } from "@chainlink/cre-sdk";
 
-const GEMINI_URL =
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const OPENROUTER_URL =
+  "https://openrouter.ai/api/v1/chat/completions";
+
+// Change this to whichever Gemini model you prefer on OpenRouter
+const MODEL = "google/gemini-2.0-flash-001";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public types
+// Public types  (unchanged — keeps workflow.ts compatible)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type GeminiConfig = {
-  apiKey:   string;   // from runtime.getSecret({ id: "GEMINI_API_KEY" }).result().value
+  apiKey:   string;   // OpenRouter API key from runtime.getSecret(...)
   question: string;
 };
 
@@ -52,31 +40,39 @@ export function buildGeminiRequest(
   const prompt = buildPrompt(config.question);
 
   const bodyString = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    tools: [{ googleSearch: {} }],        // grounded web search for accuracy
-    generationConfig: {
-      temperature:     0.1,               // low temp → deterministic output
-      maxOutputTokens: 512,
-    },
+    model: MODEL,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+    temperature: 0.1,               // low temp → deterministic output
+    max_tokens:  512,
   });
 
-  // ── POST to Gemini ────────────────────────────────────────────────────────
- const response = sendRequester
-  .sendRequest({
-    url: `${GEMINI_URL}?key=${config.apiKey}`,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: Buffer.from(bodyString).toString("base64"),
-  })
-  .result();
+  // ── POST to OpenRouter (OpenAI-compatible) ────────────────────────────────
+  const response = sendRequester
+    .sendRequest({
+      url:     OPENROUTER_URL,
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${config.apiKey}`,
+        "HTTP-Referer":  "https://github.com/Hassan1004/ppm",   // OpenRouter requires this
+        "X-Title":       "CRE Prediction Market",
+      },
+      body: Buffer.from(bodyString).toString("base64"),
+    })
+    .result();
 
   // ── HTTP error check ──────────────────────────────────────────────────────
   if (!ok(response)) {
-    return safeDefault(`Gemini HTTP ${response.statusCode}`);
+    return safeDefault(`OpenRouter HTTP ${response.statusCode}`);
   }
 
-  // ── Extract text from Gemini response JSON ────────────────────────────────
-  const rawText = extractCandidateText(text(response));
+  // ── Extract text from OpenRouter response JSON ────────────────────────────
+  const rawText = extractOpenRouterText(text(response));
   return parseGeminiJSON(rawText);
 }
 
@@ -90,7 +86,7 @@ function buildPrompt(question: string): string {
 Question: "${question}"
 
 Rules:
-1. Use knowledge and Google Search grounding to verify the outcome.
+1. Use your knowledge to verify the outcome.
 2. Return ONLY valid JSON — no extra text, no markdown fences:
 {
   "outcome": "Yes" | "No",
@@ -101,21 +97,25 @@ Rules:
 3. If confidence is below 60%, set outcome to "No" as a safe default.`;
 }
 
-function extractCandidateText(responseBody: string): string {
+/**
+ * OpenRouter returns an OpenAI-compatible response:
+ * { choices: [{ message: { content: "..." } }] }
+ */
+function extractOpenRouterText(responseBody: string): string {
   try {
     const data = JSON.parse(responseBody) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
+      choices?: Array<{
+        message?: { content?: string };
       }>;
     };
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return data?.choices?.[0]?.message?.content ?? "";
   } catch {
     return "";
   }
 }
 
 function parseGeminiJSON(rawText: string): GeminiSettlementResult {
-  // Gemini sometimes wraps output in markdown code fences — strip them
+  // Model sometimes wraps output in markdown code fences — strip them
   const cleaned = rawText
     .replace(/```json\s*/g, "")
     .replace(/```\s*/g, "")

@@ -16157,27 +16157,36 @@ function hasDynamicChild(param) {
     return true;
   return false;
 }
-var GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+var OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+var MODEL = "google/gemini-2.0-flash-001";
 function buildGeminiRequest(sendRequester, config) {
   const prompt = buildPrompt(config.question);
   const bodyString = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    tools: [{ googleSearch: {} }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 512
-    }
+    model: MODEL,
+    messages: [
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.1,
+    max_tokens: 512
   });
   const response = sendRequester.sendRequest({
-    url: `${GEMINI_URL}?key=${config.apiKey}`,
+    url: OPENROUTER_URL,
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey}`,
+      "HTTP-Referer": "https://github.com/Hassan1004/ppm",
+      "X-Title": "CRE Prediction Market"
+    },
     body: Buffer.from(bodyString).toString("base64")
   }).result();
   if (!ok(response)) {
-    return safeDefault(`Gemini HTTP ${response.statusCode}`);
+    return safeDefault(`OpenRouter HTTP ${response.statusCode}`);
   }
-  const rawText = extractCandidateText(text(response));
+  const rawText = extractOpenRouterText(text(response));
   return parseGeminiJSON(rawText);
 }
 function buildPrompt(question) {
@@ -16186,7 +16195,7 @@ function buildPrompt(question) {
 Question: "${question}"
 
 Rules:
-1. Use knowledge and Google Search grounding to verify the outcome.
+1. Use your knowledge to verify the outcome.
 2. Return ONLY valid JSON — no extra text, no markdown fences:
 {
   "outcome": "Yes" | "No",
@@ -16196,10 +16205,10 @@ Rules:
 }
 3. If confidence is below 60%, set outcome to "No" as a safe default.`;
 }
-function extractCandidateText(responseBody) {
+function extractOpenRouterText(responseBody) {
   try {
     const data = JSON.parse(responseBody);
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return data?.choices?.[0]?.message?.content ?? "";
   } catch {
     return "";
   }
